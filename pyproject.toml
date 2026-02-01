@@ -1,0 +1,78 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agenticdb"
+version = "0.1.0"
+description = "Agent-native data runtime where actions, reasoning, and state evolution are first-class queryable semantics"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "AgenticDB Contributors" }
+]
+keywords = [
+    "database",
+    "agent",
+    "agentic",
+    "ai",
+    "state-management",
+    "event-sourcing",
+    "dependency-tracking"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "pydantic>=2.0",
+    "networkx>=3.0",
+    "ulid-py>=1.1",
+    "openai>=1.0",
+    "tenacity>=8.0",
+    "aiolimiter>=1.0",
+    "rich>=13.0",
+    "diskcache>=5.0",
+    "pyfiglet>=0.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-asyncio>=0.21",
+    "black>=23.0",
+    "ruff>=0.1",
+    "mypy>=1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Qingbolan/AgenticDataBase"
+Repository = "https://github.com/Qingbolan/AgenticDataBase"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agenticdb"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
