@@ -2,22 +2,48 @@
 
 <div align="center">
 
-**The Intelligent DataBase: Let Frontend Focus on Business Logic**
+**The Database for the Agentic Era**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-*AgenticDB = Intelligent Backend + Database*
-
-*Frontend describes requirements in natural language, AgenticDB handles storage, queries, and schema evolution automatically.*
+*In the AI era, the database design paradigm has fundamentally shifted.*
+*The consumer is no longer traditional APIs — it's Agents with generative, dynamic needs.*
 
 </div>
 
 ---
 
-## The Problem
+## The Paradigm Shift
 
-**Traditional Architecture:**
+**Before AI:** Databases served **deterministic APIs** with fixed schemas.
+
+**In the Agentic Era:** Databases must serve **AI Agents** with:
+- Dynamic, natural language queries
+- Unpredictable schema requirements
+- Context-aware interactions
+- Self-evolving data structures
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     Database Design Paradigm                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Traditional Era                    Agentic Era                      │
+│  ──────────────                     ───────────                      │
+│  Consumer: REST APIs                Consumer: AI Agents              │
+│  Queries: Predefined SQL            Queries: Natural Language        │
+│  Schema: Fixed, manual              Schema: Dynamic, auto-evolving   │
+│  Interface: CRUD endpoints          Interface: Semantic + MCP        │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**AgenticDB** is built for this new paradigm — a database that understands intent, evolves with usage, and exposes itself dynamically to any AI application.
+
+---
+
+## The Problem with Traditional Architecture
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
