@@ -340,12 +340,16 @@ class DependencyGraph:
             )
 
         # Get traversal function based on direction
+        # Edge semantics: add_edge(source, target, DEPENDS_ON) means source depends on target
+        # So edge goes FROM dependent TO dependency: source -> target
         if direction == "upstream":
-            get_neighbors = self._graph.predecessors
-            get_edge_data = lambda s, t: self._graph.get_edge_data(t, s)
-        else:
+            # why(x): find what x depends on - follow edges FROM x (successors)
             get_neighbors = self._graph.successors
             get_edge_data = lambda s, t: self._graph.get_edge_data(s, t)
+        else:
+            # impact(x): find what depends on x - find edges TO x (predecessors)
+            get_neighbors = self._graph.predecessors
+            get_edge_data = lambda s, t: self._graph.get_edge_data(t, s)
 
         # BFS traversal
         visited: set[str] = set()
@@ -452,22 +456,25 @@ class DependencyGraph:
 
     def get_roots(self) -> list[str]:
         """
-        Find all root entities (no incoming edges).
+        Find all root entities (no dependencies).
 
         Roots are typically Events - the ground truth facts
-        that everything else depends on.
+        that everything else depends on. They have no outgoing
+        DEPENDS_ON edges (they don't depend on anything).
 
         Returns:
             List of entity IDs with no dependencies
         """
+        # Edge c -> b means "c depends on b"
+        # Roots have out_degree=0 (they don't depend on anything)
         return [
             node for node in self._graph.nodes()
-            if self._graph.in_degree(node) == 0
+            if self._graph.out_degree(node) == 0
         ]
 
     def get_leaves(self) -> list[str]:
         """
-        Find all leaf entities (no outgoing edges).
+        Find all leaf entities (nothing depends on them).
 
         Leaves are typically the final outputs or actions
         at the end of dependency chains.
@@ -475,9 +482,11 @@ class DependencyGraph:
         Returns:
             List of entity IDs with no dependents
         """
+        # Edge c -> b means "c depends on b"
+        # Leaves have in_degree=0 (nothing points to them, nothing depends on them)
         return [
             node for node in self._graph.nodes()
-            if self._graph.out_degree(node) == 0
+            if self._graph.in_degree(node) == 0
         ]
 
     def subgraph(self, entity_ids: list[str]) -> DependencyGraph:

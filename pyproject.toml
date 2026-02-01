@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
-    { name = "AgenticDB Contributors" }
+    { name = "Silan Hu", email = "silan.hu@u.nus.edu" }
 ]
 keywords = [
     "database",
@@ -19,7 +19,9 @@ keywords = [
     "ai",
     "state-management",
     "event-sourcing",
-    "dependency-tracking"
+    "dependency-tracking",
+    "llm",
+    "causal-reasoning"
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -42,6 +44,8 @@ dependencies = [
     "rich>=13.0",
     "diskcache>=5.0",
     "pyfiglet>=0.8",
+    "python-dotenv>=1.0",
+    "tiktoken>=0.5",
 ]
 
 [project.optional-dependencies]
@@ -49,6 +53,7 @@ dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "pytest-asyncio>=0.21",
+    "pytest-mock>=3.10",
     "black>=23.0",
     "ruff>=0.1",
     "mypy>=1.0",
@@ -57,22 +62,83 @@ dev = [
 [project.urls]
 Homepage = "https://github.com/Qingbolan/AgenticDataBase"
 Repository = "https://github.com/Qingbolan/AgenticDataBase"
+Documentation = "https://github.com/Qingbolan/AgenticDataBase#readme"
+
+[project.scripts]
+agenticdb = "agenticdb.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["agenticdb"]
 
+# =============================================================================
+# UV Configuration (https://github.com/astral-sh/uv)
+# =============================================================================
+# UV is a fast Python package installer and resolver.
+# Install: curl -LsSf https://astral.sh/uv/install.sh | sh
+# Usage:
+#   uv venv                    # Create virtual environment
+#   uv pip install -e ".[dev]" # Install with dev dependencies
+#   uv pip sync                # Sync dependencies
+#   uv run pytest              # Run tests
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-asyncio>=0.21",
+    "pytest-mock>=3.10",
+    "black>=23.0",
+    "ruff>=0.1",
+    "mypy>=1.0",
+]
+
+# =============================================================================
+# Tool Configurations
+# =============================================================================
+
 [tool.black]
 line-length = 100
-target-version = ["py310"]
+target-version = ["py310", "py311", "py312"]
 
 [tool.ruff]
 line-length = 100
-select = ["E", "F", "I", "N", "W", "UP"]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]  # Line too long - handled by black
+
+[tool.ruff.lint.isort]
+known-first-party = ["agenticdb"]
 
 [tool.mypy]
 python_version = "3.10"
 strict = true
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "llm: marks tests that require LLM API (deselect with '-m \"not llm\"')",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["agenticdb"]
+branch = true
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
