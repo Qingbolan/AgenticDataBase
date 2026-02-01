@@ -47,39 +47,42 @@
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Frontend  │ ──► │   Backend   │ ──► │  Database   │
-│  Must know: │     │  Must write:│     │ Must design:│
-│  - API format│     │  - REST APIs│     │  - Schema   │
-│  - Field names│    │  - Business │     │  - Indexes  │
-│  - Data struct│    │    logic    │     │  - Migrations│
+│  Frontend   │ ──► │   Backend   │ ──► │  Database   │
+│  /AI Agent  │     │             │     │             │
+│             │     │  Must write:│     │ Must design:│
+│  Must know: │     │  - REST APIs│     │  - Schema   │
+│  - API format│     │  - Validation│    │  - Indexes  │
+│  - Fields   │     │  - Transform │     │  - Migration│
 └─────────────┘     └─────────────┘     └─────────────┘
+
+Problems for AI Agents:
+  ✗ Agents generate dynamic queries — fixed APIs can't handle them
+  ✗ Agents discover new data needs — manual schema changes too slow
+  ✗ Agents need context — traditional DBs don't understand intent
 ```
 
 **AgenticDB Solution:**
 
 ```
 ┌─────────────────────────────────────┐
-│            Frontend                  │
+│       Frontend / AI Agent            │
 │                                      │
-│  Only cares: User interaction +      │
-│              Business logic          │
-│                                      │
-│  Doesn't need: Fields, schemas, APIs │
+│  Only cares: Business logic          │
 │                                      │
 │  db.store("user signed up", {...})   │
 │  db.query("what did this user buy")  │
 │                                      │
 └─────────────────────────────────────┘
-                    ↕ Natural Language Dialog
+                    ↕ Natural Language / MCP
 ┌─────────────────────────────────────┐
 │           AgenticDB                  │
 │                                      │
-│  ✓ Understands semantics             │
+│  ✓ Understands semantic intent       │
 │  ✓ Proactively clarifies ambiguity   │
-│  ✓ Auto-manages schema & migrations  │
+│  ✓ Auto-evolves schema on demand     │
 │  ✓ Learns query patterns for speed   │
-│  ✓ Validates requests, rejects danger│
-│  ✓ Exposes dynamic MCP interface     │
+│  ✓ Validates & rejects bad requests  │
+│  ✓ Exposes dynamic MCP tools         │
 │                                      │
 └─────────────────────────────────────┘
 ```
