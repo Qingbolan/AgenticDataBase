@@ -452,7 +452,9 @@ class DependencyGraph:
         """
         if not nx.is_directed_acyclic_graph(self._graph):
             raise ValueError("Graph contains cycles, cannot perform topological sort")
-        return list(nx.topological_sort(self._graph))
+        # Edge c → b means "c depends on b", so NetworkX returns c, b, a
+        # We want dependencies first (a, b, c), so reverse the result
+        return list(reversed(list(nx.topological_sort(self._graph))))
 
     def get_roots(self) -> list[str]:
         """

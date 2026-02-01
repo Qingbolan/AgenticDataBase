@@ -28,7 +28,9 @@ class TestGenerateId:
 
     def test_ids_are_sortable(self):
         """IDs should be sortable by time (ULID property)."""
+        import time
         id1 = generate_id()
+        time.sleep(0.002)  # Ensure different millisecond for ULID ordering
         id2 = generate_id()
         # ULID: later IDs should be greater
         assert id2 >= id1
