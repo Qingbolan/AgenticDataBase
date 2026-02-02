@@ -2,456 +2,193 @@
 
 <div align="center">
 
-**The Database for the Agentic Era**
+**Intent-Aware Transactions for Agent-Driven Workloads**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-
-*In the AI era, the database design paradigm has fundamentally shifted.*
-*The consumer is no longer traditional APIs — it's Agents with generative, dynamic needs.*
 
 </div>
 
 ---
 
-## The Paradigm Shift
+## Thesis
 
-**Before AI:** Databases served **deterministic APIs** with fixed schemas.
+Traditional database transactions assume complete, deterministic, trusted queries. Agent-driven workloads violate all three assumptions. AgenticDB introduces **Intent-Aware Transactions (IAT)**—a transaction model where incomplete intent is a valid state, binding occurs within the transaction boundary, and safety is enforced before execution.
 
-**In the Agentic Era:** Databases must serve **AI Agents** with:
-- Dynamic, natural language queries
-- Unpredictable schema requirements
-- Context-aware interactions
-- Self-evolving data structures
+> **Agent memory remembers what an agent did.**
+> **AgenticDB decides whether an agent is *allowed* to do it.**
+
+---
+
+## The Problem
+
+When the caller is a generative agent, four assumptions of conventional databases fail:
+
+| Assumption | Traditional | Agent Workload | Failure Mode |
+|------------|-------------|----------------|--------------|
+| **Complete Parameters** | All params known at parse time | Params may be unspecified | Guess or fail |
+| **Deterministic Queries** | Same input → same plan | Generative, variable | Unpredictable |
+| **Trusted Caller** | Backend validates | DB faces agent directly | Safety violations |
+| **Stateless Semantics** | Query is self-contained | Requires refinement | Context lost |
+
+**Result**: Traditional databases either execute incorrectly or fail entirely. There is no mechanism to represent "I understood your intent but it's incomplete."
+
+---
+
+## The Contribution: Intent-Aware Transactions
+
+AgenticDB extends transaction semantics with three mechanisms:
+
+### 1. Intent as Intermediate Representation
+
+An **Intent** is a formal transaction object that may contain unbound parameters:
+
+```
+Intent := {
+    operation   : QUERY | STORE | UPDATE | DELETE
+    bindings    : Map<Slot, Value | Pending>
+    constraints : Set<SafetyConstraint>
+    state       : COMPLETE | PARTIAL | INVALID
+}
+```
+
+When `state = PARTIAL`, the transaction enters `PENDING_BINDING`—it does not fail.
+
+### 2. In-Transaction Binding
+
+Binding resolution occurs *within* the transaction boundary:
+
+```
+RECEIVED → PARSED → [PENDING_BINDING] → BOUND → VALIDATED → EXECUTED → COMPLETED
+                          ↑                         ↓
+                        bind()              PENDING_CONFIRMATION
+                                                    ↓
+                                                REJECTED
+```
+
+**Key distinction**: Client-side binding has no transaction guarantees. In-transaction binding is commit-protected.
+
+### 3. Pre-Execution Safety
+
+Validation happens **before** execution, not after failure:
+- Unsafe operations → `PENDING_CONFIRMATION`
+- Invalid operations → `REJECTED`
+- Safe, complete operations → `EXECUTED`
+
+---
+
+## Formal Properties
+
+IAT provides three guarantees that traditional transactions cannot:
+
+**Property 1: Binding Monotonicity**
+```
+Once bound, a slot cannot be unbound within the same transaction.
+∀T, s, v: bind(T, s, v) → T.bindings[s] = v at all subsequent states
+```
+
+**Property 2: Safety-Preserving Refinement**
+```
+Clarification cannot introduce safety violations.
+initial_valid(I) ∧ I' = refine(I) → final_valid(I')
+```
+
+**Property 3: Deterministic Resolution**
+```
+Same intent + same binding sequence → same final intent.
+Enables replay and audit.
+```
+
+See **[docs/theory.md](docs/theory.md)** for complete formalization.
+
+---
+
+## System Overview
+
+The core contribution is the **Intent-Aware Transaction Pipeline**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                     Database Design Paradigm                         │
+│                  Intent-Aware Transaction Pipeline                   │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  Traditional Era                    Agentic Era                      │
-│  ──────────────                     ───────────                      │
-│  Consumer: REST APIs                Consumer: AI Agents              │
-│  Queries: Predefined SQL            Queries: Natural Language        │
-│  Schema: Fixed, manual              Schema: Dynamic, auto-evolving   │
-│  Interface: CRUD endpoints          Interface: Semantic + MCP        │
+│   RECEIVED ──► PARSED ──► BOUND ──► VALIDATED ──► EXECUTED          │
+│                  │          │           │                            │
+│                  │ partial  │ unsafe    │ invalid                    │
+│                  ▼          ▼           ▼                            │
+│            ┌──────────┐ ┌──────────┐ ┌──────────┐                   │
+│            │ PENDING  │ │ PENDING  │ │ REJECTED │                   │
+│            │ BINDING  │ │ CONFIRM  │ │          │                   │
+│            └────┬─────┘ └────┬─────┘ └──────────┘                   │
+│                 │            │                                       │
+│                 │ bind()     │ confirm()                             │
+│                 └────────────┴──────────────────► EXECUTED           │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-**AgenticDB** is built for this new paradigm — a database that understands intent, evolves with usage, and exposes itself dynamically to any AI application.
+**Key insight**: `PENDING_BINDING` and `PENDING_CONFIRMATION` are *transaction states*, not errors. Clarification happens inside the transaction boundary.
+
+See **[docs/architecture.md](docs/architecture.md)** for implementation details (storage, dependency tracking, materialization).
 
 ---
 
-## The Problem with Traditional Architecture
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Frontend   │ ──► │   Backend   │ ──► │  Database   │
-│  /AI Agent  │     │             │     │             │
-│             │     │  Must write:│     │ Must design:│
-│  Must know: │     │  - REST APIs│     │  - Schema   │
-│  - API format│     │  - Validation│    │  - Indexes  │
-│  - Fields   │     │  - Transform │     │  - Migration│
-└─────────────┘     └─────────────┘     └─────────────┘
-
-Problems for AI Agents:
-  ✗ Agents generate dynamic queries — fixed APIs can't handle them
-  ✗ Agents discover new data needs — manual schema changes too slow
-  ✗ Agents need context — traditional DBs don't understand intent
-```
-
-**AgenticDB Solution:**
-
-```
-┌─────────────────────────────────────┐
-│       Frontend / AI Agent            │
-│                                      │
-│  Only cares: Business logic          │
-│                                      │
-│  db.store("user signed up", {...})   │
-│  db.query("what did this user buy")  │
-│                                      │
-└─────────────────────────────────────┘
-                    ↕ Natural Language / MCP
-┌─────────────────────────────────────┐
-│           AgenticDB                  │
-│                                      │
-│  ✓ Understands semantic intent       │
-│  ✓ Proactively clarifies ambiguity   │
-│  ✓ Auto-evolves schema on demand     │
-│  ✓ Learns query patterns for speed   │
-│  ✓ Validates & rejects bad requests  │
-│  ✓ Exposes dynamic MCP tools         │
-│                                      │
-└─────────────────────────────────────┘
-```
-
----
-
-## Quick Start
+## Usage
 
 ```python
 from agenticdb import AgenticDB
 
 db = AgenticDB()
+branch = db.create_branch("main")
 
-# Store - Just describe what happened
-db.store("user signed up", {"name": "Alice", "email": "alice@example.com"})
-# → Auto creates users table, inserts data
+# Complete intent → executes directly
+result = branch.query("orders for user Alice")
 
-db.store("user placed order", {"user": "Alice", "product": "iPhone 15", "price": 999})
-# → Auto creates orders table, links to user
+# Partial intent → enters PENDING_BINDING (not failure)
+result = branch.query("records from last month")
+# → {"status": "pending_binding", "unbound": ["target_entity"], "txn_id": "..."}
 
-# Query - Ask in natural language
-result = db.query("what did Alice buy")
-# → Returns: [{"product": "iPhone 15", "price": 999}]
+# Binding occurs WITHIN the same transaction
+result = branch.bind(target_entity="orders")
+# → Transaction proceeds to VALIDATED → EXECUTED
 
-result = db.query("total sales this month")
-# → Returns: {"answer": "Total sales: $152,000 from 89 orders"}
+# Unsafe operation → enters PENDING_CONFIRMATION (not failure)
+result = branch.execute("delete all orders older than 30 days")
+# → {"status": "pending_confirmation", "operation": "DELETE", "affected_rows": 1523}
+
+result = branch.confirm()
+# → Transaction proceeds to EXECUTED
 ```
+
+**The key difference**: Traditional databases would either execute the delete immediately or reject the ambiguous query. IAT provides a *transaction-protected* path for clarification and confirmation.
 
 ---
 
-## Core Capabilities
+## Positioning
 
-### 1. Conversational Interaction
+| System | Central Question | What It Is |
+|--------|-----------------|------------|
+| NL2SQL | "Convert question to SQL" | Query translation |
+| Semantic Layer | "What does 'revenue' mean?" | Metric definitions |
+| Agent Memory | "What did the agent do?" | Experience storage |
+| **AgenticDB** | "Is clarification needed before execution?" | **Execution governance** |
 
-AgenticDB proactively clarifies ambiguous requests:
+> **AgenticDB is a transaction system where clarification is safer than execution.**
 
-```python
->>> db.query("show me last month's data")
-{
-    "needs_clarification": True,
-    "question": "Which data do you want to see?",
-    "options": ["users", "orders", "products"]
-}
+Traditional databases assume: if you can parse it, execute it. IAT assumes: if it's ambiguous or unsafe, *ask first*—without losing transaction context.
 
->>> db.clarify("orders")
-{"data": [...], "summary": "523 orders last month"}
-```
-
-Dangerous operations require confirmation:
-
-```python
->>> db.update("delete all orders")
-{
-    "needs_confirmation": True,
-    "affected_rows": 5000,
-    "question": "Are you sure you want to delete 5000 records?"
-}
-
->>> db.confirm(yes=True)
-{"deleted": 5000}
-```
-
-### 2. Automatic Schema Evolution
-
-No manual table creation or alterations:
-
-```python
-# First store - auto create table
-db.store("user signed up", {"name": "Alice", "email": "a@test.com"})
-# → CREATE TABLE users (id, name, email, created_at)
-
-# New field appears - auto add column
-db.store("user signed up", {"name": "Bob", "email": "b@test.com", "phone": "138xxx"})
-# → ALTER TABLE users ADD COLUMN phone
-```
-
-### 3. Query Pattern Caching
-
-Learn repeated patterns, skip LLM for faster execution:
-
-```python
-# First query - LLM parses (~500ms)
-db.query("show orders from last month")
-
-# Similar query - pattern match (~10ms)
-db.query("show orders from last week")
-# → Matches pattern "show {entity} from {time}" → skips LLM
-```
-
-### 4. Request Validation
-
-Rejects invalid requests with suggestions:
-
-```python
->>> db.store("set price to -100", {"product_id": "p_001"})
-{
-    "rejected": True,
-    "reason": "Price cannot be negative",
-    "suggestion": "Did you mean to set a discount?"
-}
-```
-
-### 5. Dynamic MCP Interface
-
-AgenticDB exposes itself as an MCP (Model Context Protocol) server, allowing external AI applications to interact with it. **The interface dynamically updates based on current database schema.**
-
-```python
-# Start MCP server
-agenticdb --mcp --port 3000
-```
-
-**Dynamic Tool Generation:**
-
-When tables change, MCP tools automatically update:
-
-```
-Database State                    Generated MCP Tools
-─────────────────────────────────────────────────────────────────
-Empty database                 →  [query, store]
-
-After "user signed up"         →  [query, store,
-                                   get_users, create_user,
-                                   update_user, delete_user]
-
-After "user placed order"      →  [query, store,
-                                   get_users, create_user, ...,
-                                   get_orders, create_order, ...]
-```
-
-**MCP Tool Schema Example:**
-
-```json
-{
-  "name": "get_users",
-  "description": "Query users table. Fields: id, name, email, phone, created_at",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "filter": {"type": "string", "description": "Natural language filter, e.g. 'VIP users'"},
-      "limit": {"type": "integer", "default": 100}
-    }
-  }
-}
-```
-
-**Usage with Claude Desktop:**
-
-```json
-// claude_desktop_config.json
-{
-  "mcpServers": {
-    "agenticdb": {
-      "command": "agenticdb",
-      "args": ["--mcp"],
-      "env": {
-        "AGENTICDB_PATH": "/path/to/your/database.db"
-      }
-    }
-  }
-}
-```
-
-Then in Claude:
-
-```
-Human: Show me all users who signed up this week
-Claude: [Calls get_users tool with filter="signed up this week"]
-        Found 15 users who signed up this week...
-```
+See **[docs/comparison.md](docs/comparison.md)** for detailed analysis.
 
 ---
 
-## Architecture
+## Documentation
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                           AgenticDB                                  │
-├─────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │                    Pattern Cache                             │    │
-│  │  Learned patterns → SQL templates → fast execution           │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-│                              ↓ cache miss                            │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
-│  │ IntentAgent  │→ │ClarifyAgent  │→ │ValidateAgent │              │
-│  │  Parse intent│  │  Clarify     │  │  Validate    │              │
-│  └──────────────┘  └──────────────┘  └──────────────┘              │
-│                              ↓                                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
-│  │ SchemaAgent  │→ │ QueryBuilder │→ │  Executor    │              │
-│  │ Auto schema  │  │  Text→SQL    │  │ Execute+fmt  │              │
-│  └──────────────┘  └──────────────┘  └──────────────┘              │
-│                              ↓                                       │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │              SQLite / PostgreSQL / MySQL                     │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-│                              ↓                                       │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │                      MCP Server                              │    │
-│  │  Dynamic tools based on schema: get_X, create_X, update_X   │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────────┘
-                              ↓
-        ┌─────────────────────────────────────────────┐
-        │           External AI Applications           │
-        │  Claude Desktop / Cursor / Custom Agents    │
-        └─────────────────────────────────────────────┘
-```
-
-### Agent Responsibilities
-
-| Agent                   | Responsibility             | Example                      |
-| ----------------------- | -------------------------- | ---------------------------- |
-| **IntentAgent**   | Parse user intent          | "show orders" → QUERY       |
-| **ClarifyAgent**  | Clarify ambiguous requests | "Which time period?"         |
-| **ValidateAgent** | Validate reasonableness    | "Price cannot be negative"   |
-| **SchemaAgent**   | Manage table structure     | Auto create/alter tables     |
-| **QueryBuilder**  | Generate SQL               | Natural language → SQL      |
-| **Executor**      | Execute and format         | Return user-friendly results |
-
-### Request Flow
-
-1. **Pattern Cache Check** - If query matches a learned pattern, skip LLM and execute directly
-2. **Intent Recognition** - LLM parses user intent (QUERY / STORE / UPDATE / DELETE)
-3. **Clarification** - If ambiguous, ask user for clarification
-4. **Validation** - Check if request is reasonable, reject dangerous operations
-5. **Schema Evolution** - Auto create/alter tables if needed
-6. **Query Building** - Generate SQL from natural language
-7. **Execution** - Execute SQL, format results, learn new patterns
-
-### Query Pattern Learning
-
-```
-User Query                    Learned Pattern              SQL Template
-─────────────────────────────────────────────────────────────────────────
-"show orders from last month" → "show {entity} from {time}" → SELECT * FROM {table}
-                                                               WHERE created_at
-                                                               BETWEEN {start} AND {end}
-
-"how many users"              → "how many {entity}"         → SELECT COUNT(*) FROM {table}
-
-"find orders where price > 100" → "find {entity} where {condition}" → SELECT * FROM {table}
-                                                                        WHERE {condition}
-```
-
-### MCP Dynamic Interface
-
-AgenticDB automatically generates MCP tools based on database schema:
-
-```
-Schema Change                  MCP Tools Update
-─────────────────────────────────────────────────────────────────────────
-CREATE TABLE users          →  + get_users(filter?, limit?)
-                               + create_user(name, email, ...)
-                               + update_user(id, fields...)
-                               + delete_user(id)
-
-ALTER TABLE users           →  Tool schemas update to include
-ADD COLUMN phone               new 'phone' field
-
-CREATE TABLE orders         →  + get_orders(filter?, limit?)
-                               + create_order(user_id, product, ...)
-                               + ...
-```
-
----
-
-## Use Cases
-
-### Rapid Prototyping
-
-```python
-# No database design, no API writing, just start
-from agenticdb import AgenticDB
-
-db = AgenticDB()
-
-@app.post("/api/action")
-async def handle(request):
-    return db.execute(request.natural_language_input)
-```
-
-### Internal Tools / Admin Dashboards
-
-```python
-# Operations staff query directly in natural language
-db.query("find VIP users who haven't logged in for 7 days")
-db.query("show conversion rate by channel")
-db.query("mark these users as high risk")
-```
-
-### AI Agent State Storage
-
-```python
-# Memory and state management for AI agents
-db.store("user said they want to buy a phone", {"user_id": "u123", "intent": "purchase"})
-db.store("recommended iPhone 15", {"user_id": "u123", "recommendation": "..."})
-db.query("what has this user chatted about before")
-```
-
-### MCP Backend for AI Applications
-
-```python
-# Run as MCP server for Claude Desktop, Cursor, etc.
-agenticdb --mcp --port 3000
-
-# External AI can now:
-# - Query any table with natural language
-# - Create/update/delete records
-# - Get schema-aware tool suggestions
-```
-
-### Low-Code / No-Code Platforms
-
-```python
-# Business users configure, no developer intervention
-db.store("create a new customer", form_data)
-db.query("all orders for this customer")
-db.update("upgrade customer to VIP", {"customer_id": "..."})
-```
-
----
-
-## Comparison
-
-| Feature                    | AgenticDB | Supabase | Firebase | Traditional Backend |
-| -------------------------- | --------- | -------- | -------- | ------------------- |
-| Natural language interface | ✅        | ❌       | ❌       | ❌                  |
-| Auto schema evolution      | ✅        | ❌       | Partial  | ❌                  |
-| Proactive clarification    | ✅        | ❌       | ❌       | ❌                  |
-| Query pattern learning     | ✅        | ❌       | ❌       | ❌                  |
-| Dynamic MCP interface      | ✅        | ❌       | ❌       | ❌                  |
-| Zero frontend config       | ✅        | ❌       | Partial  | ❌                  |
-
----
-
-## Project Structure
-
-```
-agenticdb/
-├── core/
-│   ├── database.py           # Database connection (SQLite/PostgreSQL)
-│   ├── schema.py             # Dynamic schema management
-│   ├── types.py              # Core type definitions
-│   └── session.py            # Conversation state management
-├── agents/
-│   ├── base/                 # LLM Agent base class
-│   ├── intent.py             # Intent recognition
-│   ├── clarify.py            # Ambiguity clarification
-│   ├── validate.py           # Request validation
-│   ├── query_builder.py      # Text → SQL generation
-│   └── schema_evolver.py     # Schema evolution
-├── patterns/
-│   ├── cache.py              # Query pattern storage
-│   ├── matcher.py            # Pattern matching engine
-│   └── learner.py            # Auto-learn new patterns
-├── executor/
-│   ├── engine.py             # SQL execution
-│   └── formatter.py          # Result formatting
-├── mcp/
-│   ├── server.py             # MCP server implementation
-│   ├── tools.py              # Dynamic tool generation
-│   └── schema_sync.py        # Schema → MCP tool sync
-└── prompts/                  # LLM prompts
-    ├── intent.md
-    ├── clarify.md
-    ├── query.md
-    └── schema.md
-```
+| Document | Content |
+|----------|---------|
+| **[docs/theory.md](docs/theory.md)** | Formal IAT model, properties, proofs |
+| **[docs/comparison.md](docs/comparison.md)** | vs. NL2SQL, semantic layers, agent memory |
+| **[docs/architecture.md](docs/architecture.md)** | System components, layers, implementation |
+| **[docs/vision.md](docs/vision.md)** | Killer applications, use cases |
 
 ---
 
@@ -462,31 +199,21 @@ git clone https://github.com/Qingbolan/AgenticDataBase.git
 cd AgenticDataBase
 uv venv && source .venv/bin/activate
 uv pip install -e ".[dev]"
-
-# Configure LLM
-cp .env.example .env
-# Add OPENAI_API_KEY to .env
 ```
 
-## Running
-
-```bash
-# Python SDK
-from agenticdb import AgenticDB
-db = AgenticDB("./data.db")
-
-# MCP Server mode
-agenticdb --mcp --port 3000
-
-# With specific database
-agenticdb --mcp --db ./myapp.db
-```
-
-## Running Tests
+## Tests
 
 ```bash
 uv run pytest tests/ -v
 ```
+
+---
+
+## References
+
+- Gray & Reuter. *Transaction Processing: Concepts and Techniques*. 1992.
+- Hellerstein et al. *Architecture of a Database System*. 2007.
+- Buneman et al. *Why and Where: A Characterization of Data Provenance*. ICDT 2001.
 
 ---
 
@@ -498,6 +225,6 @@ MIT
 
 <div align="center">
 
-**AgenticDB** — Natural Language In, Intelligent Backend Out
+**AgenticDB** — A transaction model where clarification is safer than execution.
 
 </div>
