@@ -24,12 +24,12 @@ Traditional database transactions assume complete, deterministic, trusted querie
 
 When the caller is a generative agent, four assumptions of conventional databases fail:
 
-| Assumption | Traditional | Agent Workload | Failure Mode |
-|------------|-------------|----------------|--------------|
-| **Complete Parameters** | All params known at parse time | Params may be unspecified | Guess or fail |
-| **Deterministic Queries** | Same input → same plan | Generative, variable | Unpredictable |
-| **Trusted Caller** | Backend validates | DB faces agent directly | Safety violations |
-| **Stateless Semantics** | Query is self-contained | Requires refinement | Context lost |
+| Assumption                      | Traditional                    | Agent Workload            | Failure Mode      |
+| ------------------------------- | ------------------------------ | ------------------------- | ----------------- |
+| **Complete Parameters**   | All params known at parse time | Params may be unspecified | Guess or fail     |
+| **Deterministic Queries** | Same input → same plan        | Generative, variable      | Unpredictable     |
+| **Trusted Caller**        | Backend validates              | DB faces agent directly   | Safety violations |
+| **Stateless Semantics**   | Query is self-contained        | Requires refinement       | Context lost      |
 
 **Result**: Traditional databases either execute incorrectly or fail entirely. There is no mechanism to represent "I understood your intent but it's incomplete."
 
@@ -71,6 +71,7 @@ RECEIVED → PARSED → [PENDING_BINDING] → BOUND → VALIDATED → EXECUTED �
 ### 3. Pre-Execution Safety
 
 Validation happens **before** execution, not after failure:
+
 - Unsafe operations → `PENDING_CONFIRMATION`
 - Invalid operations → `REJECTED`
 - Safe, complete operations → `EXECUTED`
@@ -82,18 +83,21 @@ Validation happens **before** execution, not after failure:
 IAT provides three guarantees that traditional transactions cannot:
 
 **Property 1: Binding Monotonicity**
+
 ```
 Once bound, a slot cannot be unbound within the same transaction.
 ∀T, s, v: bind(T, s, v) → T.bindings[s] = v at all subsequent states
 ```
 
 **Property 2: Safety-Preserving Refinement**
+
 ```
 Clarification cannot introduce safety violations.
 initial_valid(I) ∧ I' = refine(I) → final_valid(I')
 ```
 
 **Property 3: Deterministic Resolution**
+
 ```
 Same intent + same binding sequence → same final intent.
 Enables replay and audit.
@@ -109,21 +113,21 @@ The core contribution is the **Intent-Aware Transaction Pipeline**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                  Intent-Aware Transaction Pipeline                   │
+│                  Intent-Aware Transaction Pipeline                  │
 ├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
+│                                                                     │
 │   RECEIVED ──► PARSED ──► BOUND ──► VALIDATED ──► EXECUTED          │
-│                  │          │           │                            │
-│                  │ partial  │ unsafe    │ invalid                    │
-│                  ▼          ▼           ▼                            │
+│                  │          │           │                           │
+│                  │ partial  │ unsafe    │ invalid                   │
+│                  ▼          ▼           ▼                           │
 │            ┌──────────┐ ┌──────────┐ ┌──────────┐                   │
 │            │ PENDING  │ │ PENDING  │ │ REJECTED │                   │
 │            │ BINDING  │ │ CONFIRM  │ │          │                   │
 │            └────┬─────┘ └────┬─────┘ └──────────┘                   │
-│                 │            │                                       │
-│                 │ bind()     │ confirm()                             │
-│                 └────────────┴──────────────────► EXECUTED           │
-│                                                                      │
+│                 │            │                                      │
+│                 │ bind()     │ confirm()                            │
+│                 └────────────┴──────────────────► EXECUTED          │
+│                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -166,11 +170,11 @@ result = branch.confirm()
 
 ## Positioning
 
-| System | Central Question | What It Is |
-|--------|-----------------|------------|
-| NL2SQL | "Convert question to SQL" | Query translation |
-| Semantic Layer | "What does 'revenue' mean?" | Metric definitions |
-| Agent Memory | "What did the agent do?" | Experience storage |
+| System              | Central Question                            | What It Is                     |
+| ------------------- | ------------------------------------------- | ------------------------------ |
+| NL2SQL              | "Convert question to SQL"                   | Query translation              |
+| Semantic Layer      | "What does 'revenue' mean?"                 | Metric definitions             |
+| Agent Memory        | "What did the agent do?"                    | Experience storage             |
 | **AgenticDB** | "Is clarification needed before execution?" | **Execution governance** |
 
 > **AgenticDB is a transaction system where clarification is safer than execution.**
@@ -183,12 +187,12 @@ See **[docs/comparison.md](docs/comparison.md)** for detailed analysis.
 
 ## Documentation
 
-| Document | Content |
-|----------|---------|
-| **[docs/theory.md](docs/theory.md)** | Formal IAT model, properties, proofs |
-| **[docs/comparison.md](docs/comparison.md)** | vs. NL2SQL, semantic layers, agent memory |
+| Document                                            | Content                                   |
+| --------------------------------------------------- | ----------------------------------------- |
+| **[docs/theory.md](docs/theory.md)**             | Formal IAT model, properties, proofs      |
+| **[docs/comparison.md](docs/comparison.md)**     | vs. NL2SQL, semantic layers, agent memory |
 | **[docs/architecture.md](docs/architecture.md)** | System components, layers, implementation |
-| **[docs/vision.md](docs/vision.md)** | Killer applications, use cases |
+| **[docs/vision.md](docs/vision.md)**             | Killer applications, use cases            |
 
 ---
 
