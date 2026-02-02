@@ -1,4 +1,6 @@
+# coding: utf-8
 """
+Author: Silan Hu(silan.hu@u.nus.edu)
 Storage engine for AgenticDB.
 
 This module provides the storage abstraction layer, enabling pluggable

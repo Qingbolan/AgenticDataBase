@@ -14,7 +14,6 @@ Agent Architecture:
 - Query Agents: Causal reasoning (why/impact)
 - Memory Agents: Entity state management
 """
-
 from agenticdb.core.models import Action, Claim, Entity, Event
 from agenticdb.core.version import Branch, Snapshot, Version
 from agenticdb.core.dependency import DependencyEdge, DependencyGraph

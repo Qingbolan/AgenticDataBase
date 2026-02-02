@@ -1,4 +1,6 @@
+# coding: utf-8
 """
+Author: Silan Hu(silan.hu@u.nus.edu)
 Main client interface for AgenticDB.
 
 This module provides the primary SDK for interacting with AgenticDB,
@@ -672,3 +674,225 @@ class AgenticDB:
         self._subscriptions.clear()
         self._branch_handles.clear()
         self._create_default_branch()
+
+    # =========================================================================
+    # Intent-Aware Transaction API
+    # =========================================================================
+
+    def query(
+        self,
+        query_text: str,
+        bindings: Optional[dict[str, Any]] = None,
+        branch_id: Optional[str] = None,
+    ) -> "QueryResult":
+        """
+        Execute a natural language query with Intent-aware processing.
+
+        This is the primary interface for the Intent-Aware Transaction Pipeline.
+        The query is parsed into Intent IR, bindings are resolved, and the
+        operation is executed (or returned with pending state if needed).
+
+        Args:
+            query_text: Natural language query
+            bindings: Optional explicit bindings for parameters
+            branch_id: Branch to query (default: main)
+
+        Returns:
+            QueryResult with status and data
+
+        Example:
+            ```python
+            # Complete query - executes directly
+            result = db.query("show orders from last week")
+            print(result.data)
+
+            # Partial query - returns pending state
+            result = db.query("show records from last month")
+            if result.status == "pending_binding":
+                result = db.bind(result.transaction_id, target="orders")
+            ```
+        """
+        from .query_result import QueryResult
+        from agenticdb.core.agents.transaction import CoordinatorAgent
+        from agenticdb.core.agents.base.base_agent import AgentContext
+
+        # Get coordinator (create if needed)
+        if not hasattr(self, "_coordinator"):
+            self._coordinator = CoordinatorAgent(
+                available_tables=self._get_available_tables()
+            )
+
+        # Create context
+        ctx = AgentContext(
+            branch_id=branch_id or self.branch().id,
+        )
+
+        # Process through coordinator
+        coordination_result = self._coordinator.run(
+            ctx,
+            query_text,
+            bindings=bindings,
+        )
+
+        return QueryResult.from_coordination_result(coordination_result)
+
+    def bind(
+        self,
+        transaction_id: str,
+        **bindings: Any,
+    ) -> "QueryResult":
+        """
+        Provide bindings for a pending transaction.
+
+        Args:
+            transaction_id: ID of the pending transaction
+            **bindings: Named bindings to apply
+
+        Returns:
+            QueryResult with updated status
+
+        Example:
+            ```python
+            result = db.query("show records from last month")
+            if result.status == "pending_binding":
+                result = db.bind(result.transaction_id, target="orders")
+            ```
+        """
+        from .query_result import QueryResult
+        from agenticdb.core.agents.base.base_agent import AgentContext
+
+        if not hasattr(self, "_coordinator"):
+            return QueryResult.error("No active coordinator")
+
+        ctx = AgentContext(branch_id=self.branch().id)
+        coordination_result = self._coordinator.bind(ctx, transaction_id, bindings)
+        return QueryResult.from_coordination_result(coordination_result)
+
+    def confirm(
+        self,
+        transaction_id: str,
+        yes: bool = True,
+    ) -> "QueryResult":
+        """
+        Confirm or reject a pending confirmation.
+
+        Args:
+            transaction_id: ID of the pending transaction
+            yes: True to confirm, False to reject
+
+        Returns:
+            QueryResult with final status
+
+        Example:
+            ```python
+            result = db.query("delete all inactive users")
+            if result.status == "pending_confirmation":
+                result = db.confirm(result.transaction_id, yes=True)
+            ```
+        """
+        from .query_result import QueryResult
+        from agenticdb.core.agents.base.base_agent import AgentContext
+
+        if not hasattr(self, "_coordinator"):
+            return QueryResult.error("No active coordinator")
+
+        ctx = AgentContext(branch_id=self.branch().id)
+        coordination_result = self._coordinator.confirm(ctx, transaction_id, yes)
+        return QueryResult.from_coordination_result(coordination_result)
+
+    def store(
+        self,
+        event_type: str,
+        data: dict[str, Any],
+        branch_id: Optional[str] = None,
+    ) -> "QueryResult":
+        """
+        Store an event with automatic schema inference.
+
+        Args:
+            event_type: Type of the event (e.g., "UserRegistered")
+            data: Event data payload
+            branch_id: Branch to store in (default: main)
+
+        Returns:
+            QueryResult with stored event info
+
+        Example:
+            ```python
+            result = db.store("UserRegistered", {
+                "name": "Alice",
+                "email": "alice@example.com"
+            })
+            ```
+        """
+        from .query_result import QueryResult
+
+        try:
+            event = Event(
+                event_type=event_type,
+                data=data,
+            )
+
+            handle = self.branch(branch_id)
+            stored_event = handle.record(event)
+
+            return QueryResult.success(
+                data={"event_id": stored_event.id},
+                affected_rows=1,
+            )
+        except Exception as e:
+            return QueryResult.error(str(e))
+
+    def transaction(self) -> "TransactionBuilder":
+        """
+        Start a transaction builder for fluent API.
+
+        Returns:
+            TransactionBuilder for chaining operations
+
+        Example:
+            ```python
+            result = (
+                db.transaction()
+                  .query("show orders from last week")
+                  .where(total__gt=100)
+                  .limit(10)
+                  .execute()
+            )
+            ```
+        """
+        from .builders import TransactionBuilder
+        return TransactionBuilder(self)
+
+    def session(self) -> "Session":
+        """
+        Create a session for multi-turn interactions.
+
+        Returns:
+            Session context manager
+
+        Example:
+            ```python
+            with db.session() as session:
+                r1 = session.query("show me users")
+                r2 = session.bind(target="customers")
+                r3 = session.query("filter by active")
+            ```
+        """
+        from .session import Session
+        return Session(self)
+
+    def _get_available_tables(self) -> list[str]:
+        """Get list of available tables for Intent parsing."""
+        # This would typically query the schema
+        # For now, return common event types
+        tables = set()
+
+        try:
+            # Get event types from recorded events
+            for event in self.branch().events(limit=100):
+                tables.add(event.event_type.lower())
+        except Exception:
+            pass
+
+        return list(tables) or ["events", "claims", "actions"]

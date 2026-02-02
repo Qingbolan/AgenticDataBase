@@ -1,4 +1,6 @@
+# coding: utf-8
 """
+Author: Silan Hu(silan.hu@u.nus.edu)
 Indexing for AgenticDB.
 
 This module provides indexing capabilities for fast queries,

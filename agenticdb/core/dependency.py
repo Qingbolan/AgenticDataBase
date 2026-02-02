@@ -1,4 +1,6 @@
+# coding: utf-8
 """
+Author: Silan Hu(silan.hu@u.nus.edu)
 Dependency graph for AgenticDB.
 
 This module provides causal tracking between entities, enabling
@@ -15,7 +17,6 @@ Design Philosophy:
     first-class data structure that captures the causal relationships
     between all entities in the system.
 """
-
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -30,7 +31,6 @@ from agenticdb.core.models import generate_id
 
 class EdgeType(str, Enum):
     """Types of dependency relationships."""
-
     DEPENDS_ON = "depends_on"  # A requires B to exist/execute
     PRODUCES = "produces"  # A creates B
     INVALIDATES = "invalidates"  # A makes B stale
@@ -53,7 +53,6 @@ class DependencyEdge(BaseModel):
         - Claim "new_score" SUPERSEDES Claim "old_score"
         - Event "DataUpdated" INVALIDATES Claim "cached_result"
     """
-
     id: str = Field(default_factory=generate_id, description="Edge identifier")
     source_id: str = Field(..., description="Source entity ID")
     target_id: str = Field(..., description="Target entity ID")
@@ -76,7 +75,6 @@ class DependencyEdge(BaseModel):
 
 class TraversalResult(BaseModel):
     """Result of a graph traversal operation."""
-
     root_id: str = Field(..., description="Starting entity ID")
     direction: str = Field(..., description="Traversal direction: upstream or downstream")
     entities: list[str] = Field(default_factory=list, description="Entity IDs in traversal order")
@@ -103,7 +101,6 @@ class DependencyGraph:
         This class is NOT thread-safe. Use appropriate synchronization
         if accessing from multiple threads.
     """
-
     def __init__(self, branch_id: Optional[str] = None):
         """
         Initialize an empty dependency graph.

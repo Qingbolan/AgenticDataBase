@@ -23,7 +23,6 @@ class ActionExtractorAgent(BaseAgent[ExtractionResult]):
     Actions are agent behaviors with explicit dependencies. They transform state
     and can produce new events, claims, or trigger other actions.
     """
-
     name = "action_extractor"
 
     def __init__(

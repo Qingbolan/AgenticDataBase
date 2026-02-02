@@ -1,4 +1,6 @@
+# coding: utf-8
 """
+Author: Silan Hu(silan.hu@u.nus.edu)
 Type definitions for Pattern learning agents.
 
 These types define the input/output contracts for Pattern agents.

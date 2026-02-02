@@ -1,4 +1,6 @@
+# coding: utf-8
 """
+Author: Silan Hu(silan.hu@u.nus.edu)
 Core entity models for AgenticDB.
 
 This module defines the fundamental data primitives that make agent behavior

@@ -1,4 +1,6 @@
+# coding: utf-8
 """
+Author: Silan Hu(silan.hu@u.nus.edu)
 Pattern learning agents for AgenticDB.
 
 This module provides agents for extracting and matching query patterns
@@ -14,11 +16,19 @@ from .types import (
     PatternScore,
     PatternExtractionResult,
     PatternMatchResult,
+    PatternCacheStats,
 )
+from .extractor_agent import PatternExtractorAgent
+from .matcher_agent import PatternMatcherAgent
 
 __all__ = [
+    # Types
     "PatternMatch",
     "PatternScore",
     "PatternExtractionResult",
     "PatternMatchResult",
+    "PatternCacheStats",
+    # Agents
+    "PatternExtractorAgent",
+    "PatternMatcherAgent",
 ]

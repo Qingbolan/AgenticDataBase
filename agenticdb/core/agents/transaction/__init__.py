@@ -1,4 +1,6 @@
+# coding: utf-8
 """
+Author: Silan Hu(silan.hu@u.nus.edu)
 Transaction management agents for AgenticDB.
 
 This module provides agents for coordinating and executing transactions
@@ -15,10 +17,16 @@ from .types import (
     TransactionError,
     CoordinationResult,
 )
+from .coordinator_agent import CoordinatorAgent
+from .executor_agent import ExecutorAgent
 
 __all__ = [
+    # Types
     "ExecutionResult",
     "ConfirmationRequest",
     "TransactionError",
     "CoordinationResult",
+    # Agents
+    "CoordinatorAgent",
+    "ExecutorAgent",
 ]
